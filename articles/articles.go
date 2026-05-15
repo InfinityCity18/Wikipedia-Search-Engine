@@ -11,10 +11,11 @@ import (
 type Article struct {
 	Title   string `json:"title"`
 	Content string `json:"text"`
+	Stemmed string
 }
 
 func (art *Article) ReturnWordsNonUnique() []string {
-	return strings.Fields(art.Content)
+	return strings.Fields(art.Stemmed)
 }
 
 func (art *Article) StemAndRemoveStopWords() error {
@@ -23,7 +24,7 @@ func (art *Article) StemAndRemoveStopWords() error {
 		slog.Error("Failed to stem and remove stop words", "error", err)
 		return err
 	} else {
-		art.Content = content
+		art.Stemmed = content
 		return nil
 	}
 }

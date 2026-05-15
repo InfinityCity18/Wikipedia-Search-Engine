@@ -13,5 +13,6 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/pgvector/pgvector-go v0.3.0 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 )
