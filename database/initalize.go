@@ -1,0 +1,55 @@
+package database
+
+import (
+	"context"
+	"log/slog"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	pgxvec "github.com/pgvector/pgvector-go/pgx"
+)
+
+func initalize(connString string) (Database, error) {
+	conf, err := pgxpool.ParseConfig(connString)
+	if err != nil {
+		slog.Error("Failed to parse config", "error", err)
+		return Database{}, err
+	}
+	conf.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		return pgxvec.RegisterTypes(ctx, conn)
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), conf)
+	if err != nil {
+		slog.Error("Failed to connect to database", "error", err)
+		return Database{}, err
+	}
+	_, err = pool.Exec(context.Background(),
+		`CREATE TABLE IF NOT EXISTS dictionary (
+		id SERIAL PRIMARY KEY,
+		word VARCHAR(100) NOT NULL,
+		docs_count INT,
+		global_count INT,
+		idf double precision
+		);`)
+	if err != nil {
+		slog.Error("Failed to execute init dictionary table query", "error", err)
+		return Database{}, err
+	}
+	_, err = pool.Exec(context.Background(),
+		`CREATE TABLE IF NOT EXISTS documents (
+		id SERIAL PRIMARY KEY,
+		title VARCHAR(100) NOT NULL,
+		content TEXT NOT NULL
+		);`)
+	if err != nil {
+		slog.Error("Failed to execute init documents table query", "error", err)
+		return Database{}, err
+	}
+	_, err = pool.Exec(context.Background(), "CREATE EXTENSION IF NOT EXISTS vector")
+	if err != nil {
+		slog.Error("Failed to create vector extension", "error", err)
+		return Database{}, err
+	}
+
+	return Database{pool}, nil
+}
