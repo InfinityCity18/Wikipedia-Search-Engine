@@ -13,8 +13,8 @@ import (
 
 const Limit_count = 500000
 
-func (db *Database) insertDictionary(dataDirPath string) ([]*articles.Article, error) {
-	dictionary, articles_list, length, err := dict.CreateDict(dataDirPath)
+func (db *Database) insertDictionary(articles_list []*articles.Article) error {
+	dictionary, length, err := dict.CreateDict(articles_list)
 	if err != nil {
 		slog.Error("Failed to create dictionary", "error", err)
 	}
@@ -35,7 +35,7 @@ func (db *Database) insertDictionary(dataDirPath string) ([]*articles.Article, e
 
 	if err != nil {
 		slog.Error("Failed to insert dictionary", "error", err)
-		return nil, err
+		return nil
 	}
 
 	_, err = db.pool.Exec(context.Background(),
@@ -49,12 +49,12 @@ func (db *Database) insertDictionary(dataDirPath string) ([]*articles.Article, e
 		);`, Limit_count))
 	if err != nil {
 		slog.Error("Failed to delete rows from dictionary", "error", err)
-		return nil, err
+		return nil
 	}
 	conn, err := db.pool.Acquire(context.Background())
 	if err != nil {
 		slog.Error("Connection acquire failed", "error", err)
-		return nil, err
+		return nil
 	}
 	_, err = conn.Exec(context.Background(),
 		`BEGIN;
@@ -77,7 +77,7 @@ func (db *Database) insertDictionary(dataDirPath string) ([]*articles.Article, e
 		COMMIT;`)
 	if err != nil {
 		slog.Error("Failed to reindex", "error", err)
-		return nil, err
+		return nil
 	}
-	return articles_list, nil
+	return nil
 }

@@ -46,5 +46,6 @@ func LoadArticleFromJson(filePath string) (*Article, error) {
 	if err := json.Unmarshal(byteValue, art); err != nil {
 		return nil, err
 	}
+	art.Title = strings.ReplaceAll(art.Title, "\n", " ")
 	return art, nil
 }

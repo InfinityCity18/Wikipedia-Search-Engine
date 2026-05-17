@@ -9,41 +9,64 @@ import (
 	"github.com/InfinityCity18/Wikipedia-Search-Engine/articles"
 )
 
-const batchSize = 30000
+const batchSize = 300
 
 type WordEntry struct {
 	Doc_count    int
 	Global_count int
 }
 
-func CreateDict(path string) (map[string]*WordEntry, []*articles.Article, int, error) {
-	dict := make(map[string]*WordEntry)
+func CreateArticlesList(path string) ([]*articles.Article, error) {
 	articles_list := []*articles.Article{}
+
 	files, err := os.ReadDir(path)
 	if err != nil {
 		slog.Error("Failed to read directory", "error", err)
-		return nil, nil, 0, err
+		return nil, err
 	}
+
 	length := len(files)
+	ch := make(chan *articles.Article, batchSize)
+	var wg sync.WaitGroup
+	for i := 0; i < length; i += batchSize {
+		wg.Go(func() {
+			end := min(i+batchSize, length)
+			window := files[i:end]
+			for _, file := range window {
+				art, err := articles.LoadArticleFromJson(path + "/" + file.Name())
+				if err != nil {
+					slog.Error("Error in goroutine loading articles", "error", err)
+				}
+				if err = art.StemAndRemoveStopWords(); err != nil {
+					slog.Error("Error in goroutine stemming words", "error", err)
+				}
+				ch <- art
+			}
+		})
+	}
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+	for art := range ch {
+		articles_list = append(articles_list, art)
+	}
+	return articles_list, nil
+}
+
+func CreateDict(articles_list []*articles.Article) (map[string]*WordEntry, int, error) {
+	dict := make(map[string]*WordEntry)
+	length := len(articles_list)
 	for i := 0; i < length; i += batchSize {
 		fmt.Println(i)
-		end := min(i + batchSize, length)
-		window := files[i:end]
+		end := min(i+batchSize, length)
+		window := articles_list[i:end]
 		var wg sync.WaitGroup
 		ch := make(chan []string, batchSize)
-		for _, file := range window {
+		for _, article := range window {
 			wg.Add(1)
 			wg.Go(func() {
-				art, err := articles.LoadArticleFromJson(path + "/" + file.Name())
-				articles_list = append(articles_list, art)
-				if err != nil {
-					slog.Error("Error in goroutine", "error", err)
-					return
-				}
-				if err := art.StemAndRemoveStopWords(); err != nil {
-					slog.Error("Error in goroutine", "error", err)
-				}
-				ch <- art.ReturnWordsNonUnique()
+				ch <- article.ReturnWordsNonUnique()
 				wg.Done()
 			})
 		}
@@ -68,5 +91,5 @@ func CreateDict(path string) (map[string]*WordEntry, []*articles.Article, int, e
 			}
 		}
 	}
-	return dict, articles_list, length, nil
+	return dict, length, nil
 }

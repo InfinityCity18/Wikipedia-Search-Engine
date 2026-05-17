@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
@@ -36,11 +37,13 @@ func initalize(connString string) (Database, error) {
 		return Database{}, err
 	}
 	_, err = pool.Exec(context.Background(),
-		`CREATE TABLE IF NOT EXISTS documents (
+		fmt.Sprintf(
+			`CREATE TABLE IF NOT EXISTS documents (
 		id SERIAL PRIMARY KEY,
-		title VARCHAR(100) NOT NULL,
-		content TEXT NOT NULL
-		);`)
+		title VARCHAR(1000) NOT NULL,
+		content TEXT NOT NULL,
+		embedding vector(%v)
+		);`, K))
 	if err != nil {
 		slog.Error("Failed to execute init documents table query", "error", err)
 		return Database{}, err
@@ -51,5 +54,5 @@ func initalize(connString string) (Database, error) {
 		return Database{}, err
 	}
 
-	return Database{pool}, nil
+	return Database{pool, nil}, nil
 }
