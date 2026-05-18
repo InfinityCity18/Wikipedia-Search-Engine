@@ -2,14 +2,13 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math"
 	"strings"
 	"sync"
 
 	"github.com/InfinityCity18/Wikipedia-Search-Engine/articles"
-	"github.com/InfinityCity18/Wikipedia-Search-Engine/redsvd"
+	"github.com/InfinityCity18/Wikipedia-Search-Engine/pythonsvd"
 	"github.com/pgvector/pgvector-go"
 	"gonum.org/v1/gonum/mat"
 )
@@ -97,21 +96,12 @@ func (db *Database) insertDocuments(art_list []*articles.Article) (*mat.Dense, e
 		sparseMatrix64[data.Row][data.Col] = data.Val
 	}
 	slog.Info("Computed TF-IDF matrix, calculating SVD...")
-	svd := redsvd.NewGoRedSVD()
-	svd.SetMatrix64(amount_of_words, len(art_list), sparseMatrix64) // Terms x Documents
-	svd.RedSVD(K)
-	U_old := svd.MatrixU()
-	V := svd.MatrixV()
-	S := svd.SingularValues()
-	fmt.Println("V len", len(V), len(V[0]))
-	fmt.Println("U len", len(U_old), len(U_old[0]))
-	fmt.Println("S len", len(S))
+	U, S, V, err := pythonsvd.TruncatedSVD(amount_of_words, len(art_list), K, sparseMatrix64)
 	slog.Info("Computed SVD, beginning inserting vectors into database...")
-
 	for j, article := range art_list {
 		vec := []float32{}
 		for k := range K {
-			vec = append(vec, V[j][k]*S[k])
+			vec = append(vec, float32(V.At(k, j)*S.At(k, k)))
 		}
 		_, err := db.pool.Exec(context.Background(), "INSERT INTO documents (title, content, embedding) VALUES ($1, $2, $3)", article.Title, article.Content, pgvector.NewVector(vec))
 		if err != nil {
@@ -123,7 +113,6 @@ func (db *Database) insertDocuments(art_list []*articles.Article) (*mat.Dense, e
 	slog.Info("Inserted vectors into database.")
 	slog.Info("Saving U matrix to file...")
 
-	U := ConvertToGonumMatrix(U_old)
 	err = SaveMatrix("Umatrix.blob", U)
 	if err != nil {
 		slog.Error("Failed to save matrix", "error", err)

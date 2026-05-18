@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math"
 
@@ -10,8 +9,6 @@ import (
 	"github.com/InfinityCity18/Wikipedia-Search-Engine/dict"
 	"github.com/jackc/pgx/v5"
 )
-
-const Limit_count = 500000
 
 func (db *Database) insertDictionary(articles_list []*articles.Article) error {
 	dictionary, length, err := dict.CreateDict(articles_list)
@@ -23,7 +20,7 @@ func (db *Database) insertDictionary(articles_list []*articles.Article) error {
 	tableName := "dictionary"
 
 	for word, word_entry := range dictionary {
-		entries = append(entries, []any{word, word_entry.Doc_count, word_entry.Global_count, float64(word_entry.Global_count) * math.Log(float64(length)/float64(word_entry.Doc_count))})
+		entries = append(entries, []any{word, word_entry.Doc_count, word_entry.Global_count, math.Log(float64(length) / float64(word_entry.Doc_count))})
 	}
 
 	_, err = db.pool.CopyFrom(
@@ -38,46 +35,46 @@ func (db *Database) insertDictionary(articles_list []*articles.Article) error {
 		return nil
 	}
 
-	_, err = db.pool.Exec(context.Background(),
-		fmt.Sprintf(
-			`DELETE FROM public.dictionary
-		WHERE id NOT IN (
-		SELECT id
-		FROM public.dictionary
-		ORDER BY idf DESC
-		LIMIT %v
-		);`, Limit_count))
-	if err != nil {
-		slog.Error("Failed to delete rows from dictionary", "error", err)
-		return nil
-	}
-	conn, err := db.pool.Acquire(context.Background())
-	if err != nil {
-		slog.Error("Connection acquire failed", "error", err)
-		return nil
-	}
-	_, err = conn.Exec(context.Background(),
-		`BEGIN;
+	// _, err = db.pool.Exec(context.Background(),
+	// 	fmt.Sprintf(
+	// 		`DELETE FROM public.dictionary
+	// 	WHERE id NOT IN (
+	// 	SELECT id
+	// 	FROM public.dictionary
+	// 	ORDER BY idf DESC
+	// 	LIMIT %v
+	// 	);`, Limit_count))
+	// if err != nil {
+	// 	slog.Error("Failed to delete rows from dictionary", "error", err)
+	// 	return nil
+	// }
+	// conn, err := db.pool.Acquire(context.Background())
+	// if err != nil {
+	// 	slog.Error("Connection acquire failed", "error", err)
+	// 	return nil
+	// }
+	// _, err = conn.Exec(context.Background(),
+	// 	`BEGIN;
 
-		WITH updated_rows AS (
-			SELECT
-				id,
-				(row_number() OVER (ORDER BY id)) * -1 AS temp_id
-			FROM dictionary
-		)
-		UPDATE dictionary t
-		SET id = u.temp_id
-		FROM updated_rows u
-		WHERE t.id = u.id;
+	// 	WITH updated_rows AS (
+	// 		SELECT
+	// 			id,
+	// 			(row_number() OVER (ORDER BY id)) * -1 AS temp_id
+	// 		FROM dictionary
+	// 	)
+	// 	UPDATE dictionary t
+	// 	SET id = u.temp_id
+	// 	FROM updated_rows u
+	// 	WHERE t.id = u.id;
 
-		UPDATE dictionary 
-		SET id = id * -1 
-		WHERE id < 0;
+	// 	UPDATE dictionary
+	// 	SET id = id * -1
+	// 	WHERE id < 0;
 
-		COMMIT;`)
-	if err != nil {
-		slog.Error("Failed to reindex", "error", err)
-		return nil
-	}
+	// 	COMMIT;`)
+	// if err != nil {
+	// 	slog.Error("Failed to reindex", "error", err)
+	// 	return nil
+	// }
 	return nil
 }

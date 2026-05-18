@@ -13,5 +13,12 @@ func main() {
 		slog.Error("Failed to create database", "error", err)
 		return
 	}
-	fmt.Println(db)
+	art, err := db.ProcessQuery("final fantasy")
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		for _, article := range art {
+			fmt.Println(*article)
+		}
+	}
 }

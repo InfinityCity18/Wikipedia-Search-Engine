@@ -1,7 +1,6 @@
 package dict
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -40,7 +39,9 @@ func CreateArticlesList(path string) ([]*articles.Article, error) {
 				if err = art.StemAndRemoveStopWords(); err != nil {
 					slog.Error("Error in goroutine stemming words", "error", err)
 				}
-				ch <- art
+				if len(art.Content) != 0 {
+					ch <- art
+				}
 			}
 		})
 	}
@@ -58,7 +59,6 @@ func CreateDict(articles_list []*articles.Article) (map[string]*WordEntry, int, 
 	dict := make(map[string]*WordEntry)
 	length := len(articles_list)
 	for i := 0; i < length; i += batchSize {
-		fmt.Println(i)
 		end := min(i+batchSize, length)
 		window := articles_list[i:end]
 		var wg sync.WaitGroup

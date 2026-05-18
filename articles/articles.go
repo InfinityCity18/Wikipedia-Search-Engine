@@ -15,11 +15,12 @@ type Article struct {
 }
 
 func (art *Article) ReturnWordsNonUnique() []string {
-	return strings.Fields(art.Stemmed)
+	title, _ := StemAndRemoveStopWordsString(art.Title)
+	return strings.Fields(title + " " + art.Stemmed)
 }
 
 func (art *Article) StemAndRemoveStopWords() error {
-	content, err := stemAndRemoveStopWordsString(art.Content)
+	content, err := StemAndRemoveStopWordsString(art.Content)
 	if err != nil {
 		slog.Error("Failed to stem and remove stop words", "error", err)
 		return err
