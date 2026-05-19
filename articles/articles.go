@@ -12,6 +12,7 @@ type Article struct {
 	Title   string `json:"title"`
 	Content string `json:"text"`
 	Stemmed string
+	Sim     float32
 }
 
 func (art *Article) ReturnWordsNonUnique() []string {

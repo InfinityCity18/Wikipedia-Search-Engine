@@ -20,7 +20,7 @@ func (db *Database) insertDictionary(articles_list []*articles.Article) error {
 	tableName := "dictionary"
 
 	for word, word_entry := range dictionary {
-		entries = append(entries, []any{word, word_entry.Doc_count, word_entry.Global_count, math.Log(float64(length) / float64(word_entry.Doc_count))})
+		entries = append(entries, []any{word, word_entry.Doc_count, word_entry.Global_count, bm25_idf(length, word_entry.Doc_count)})
 	}
 
 	_, err = db.pool.CopyFrom(
@@ -77,4 +77,12 @@ func (db *Database) insertDictionary(articles_list []*articles.Article) error {
 	// 	return nil
 	// }
 	return nil
+}
+
+func normal_idf(N int, doc_count int) float64 {
+	return math.Log(float64(N) / float64(doc_count))
+}
+
+func bm25_idf(N int, doc_count int) float64 {
+	return math.Log(1.0 + (float64(N-doc_count)+0.5)/(float64(doc_count)+0.5))
 }

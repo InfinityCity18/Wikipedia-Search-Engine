@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math"
 	"strings"
@@ -12,6 +11,8 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+const arts_limit = 10
+
 func (db *Database) ProcessQuery(query string) ([]*articles.Article, error) {
 	query, err := articles.StemAndRemoveStopWordsString(query)
 	if err != nil {
@@ -20,10 +21,9 @@ func (db *Database) ProcessQuery(query string) ([]*articles.Article, error) {
 	}
 	ids := db.getStemmedWordsId(strings.Fields(query))
 	pgv := pgvector.NewVector(multipliedQuery(ids, db.umatrix))
-	fmt.Println(pgv)
 	rows, err := db.pool.Query(
 		context.Background(),
-		"SELECT title,content FROM documents WHERE LENGTH(content) != 0 ORDER BY (1 - (embedding <=> $1)) DESC LIMIT 5", pgv)
+		"SELECT title,content,(1 - (embedding <=> $1)) FROM documents WHERE LENGTH(content) != 0 ORDER BY (1 - (embedding <=> $1)) DESC LIMIT $2", pgv, arts_limit)
 	if err != nil {
 		slog.Error("Failed to get relevant articles", "error", err)
 		return nil, err
@@ -31,12 +31,13 @@ func (db *Database) ProcessQuery(query string) ([]*articles.Article, error) {
 	art_list := []*articles.Article{}
 	for rows.Next() {
 		var title, content string
-		err := rows.Scan(&title, &content)
+		var sim float32
+		err := rows.Scan(&title, &content, &sim)
 		if err != nil {
 			slog.Error("Failed to scan from relevant article", "error", err)
 			continue
 		}
-		art := articles.Article{Title: title, Content: content}
+		art := articles.Article{Title: title, Content: content, Sim: sim}
 		art_list = append(art_list, &art)
 	}
 	return art_list, nil
@@ -64,7 +65,7 @@ func multipliedQuery(query map[int]float32, U *mat.Dense) []float32 {
 	for k := range K {
 		var sum float32 = 0.0
 		for id, idf := range query {
-			sum += float32(U.At(id, k)) * idf
+			sum += float32(U.At(id, k)) * idf * ((1.0 * (1.5 + 1.0)) / (1.0 + 1.5))
 		}
 		final_vector[k] = float32(sum)
 	}

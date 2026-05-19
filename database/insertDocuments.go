@@ -25,6 +25,11 @@ type MatrixWrite struct {
 	Val float64
 }
 
+const (
+	k1 = 1.5
+	b  = 0.75
+)
+
 func (db *Database) insertDocuments(art_list []*articles.Article) (*mat.Dense, error) {
 	rows, err := db.pool.Query(context.Background(), `
 		SELECT id, word, idf FROM dictionary
@@ -54,11 +59,18 @@ func (db *Database) insertDocuments(art_list []*articles.Article) (*mat.Dense, e
 	var wg sync.WaitGroup
 	ch := make(chan MatrixWrite)
 
+	var totalWordsAllDocs int
+	for _, article := range art_list {
+		totalWordsAllDocs += len(strings.Fields(article.Stemmed))
+	}
+	avgdl := float64(totalWordsAllDocs) / float64(len(art_list))
+
 	for i, article := range art_list {
 		wg.Add(1)
 		go func(i int, article *articles.Article) {
 			defer wg.Done()
 			words_map := make(map[string]int)
+			docLen := len(strings.Fields(article.Stemmed))
 			total := 0
 			for word := range strings.FieldsSeq(article.Stemmed) {
 				total++
@@ -78,7 +90,7 @@ func (db *Database) insertDocuments(art_list []*articles.Article) (*mat.Dense, e
 			v_len = math.Sqrt(v_len)
 			for word, count := range words_map {
 				if _, ok := index_lookup[word]; ok {
-					data := MatrixWrite{Row: index_lookup[word], Col: i, Val: float64(count) / float64(total) * words[index_lookup[word]].Idf / v_len}
+					data := MatrixWrite{Row: index_lookup[word], Col: i, Val: computeBM25Weight(count, float64(docLen), avgdl, words[index_lookup[word]].Idf)}
 					ch <- data
 				}
 			}
@@ -122,4 +134,18 @@ func (db *Database) insertDocuments(art_list []*articles.Article) (*mat.Dense, e
 	slog.Info("Saved U matrix to file")
 
 	return U, nil
+}
+
+func computeTFIDFWeight(count int, total int, idf float64, vLen float64) float64 {
+	if vLen == 0 {
+		return 0
+	}
+	return (float64(count) / float64(total)) * idf / vLen
+}
+
+func computeBM25Weight(count int, docLen float64, avgdl float64, idf float64) float64 {
+	tf := float64(count)
+	numerator := tf * (k1 + 1.0)
+	denominator := tf + k1*(1.0-b+b*(docLen/avgdl))
+	return idf * (numerator / denominator)
 }

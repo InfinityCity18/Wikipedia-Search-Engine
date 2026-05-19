@@ -53,6 +53,11 @@ func initalize(connString string) (Database, error) {
 		slog.Error("Failed to create vector extension", "error", err)
 		return Database{}, err
 	}
+	_, err = pool.Exec(context.Background(), "CREATE INDEX IF NOT EXISTS hnsw_vec_index ON documents USING hnsw (embedding vector_cosine_ops);")
+	if err != nil {
+		slog.Error("Failed to create index on embedding vector", "error", err)
+		return Database{}, err
+	}
 
 	return Database{pool, nil}, nil
 }
