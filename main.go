@@ -8,7 +8,7 @@ import (
 )
 
 const documents_path = "/home/hyperbarq/Documents/wyszaszarka/PlainTextWikipedia/processed"
-const postgres_path = "postgres://postgres:mownit@localhost:5432/search_engine"
+const postgres_path = "postgres://postgres:mownit@db:5432/search_engine"
 
 func main() {
 	db, err := database.Create(postgres_path, documents_path)
