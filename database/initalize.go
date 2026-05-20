@@ -24,6 +24,11 @@ func initalize(connString string) (Database, error) {
 		slog.Error("Failed to connect to database", "error", err)
 		return Database{}, err
 	}
+	_, err = pool.Exec(context.Background(), "CREATE EXTENSION IF NOT EXISTS vector")
+	if err != nil {
+		slog.Error("Failed to create vector extension", "error", err)
+		return Database{}, err
+	}
 	_, err = pool.Exec(context.Background(),
 		`CREATE TABLE IF NOT EXISTS dictionary (
 		id SERIAL PRIMARY KEY,
@@ -48,11 +53,7 @@ func initalize(connString string) (Database, error) {
 		slog.Error("Failed to execute init documents table query", "error", err)
 		return Database{}, err
 	}
-	_, err = pool.Exec(context.Background(), "CREATE EXTENSION IF NOT EXISTS vector")
-	if err != nil {
-		slog.Error("Failed to create vector extension", "error", err)
-		return Database{}, err
-	}
+
 	_, err = pool.Exec(context.Background(), "CREATE INDEX IF NOT EXISTS hnsw_vec_index ON documents USING hnsw (embedding vector_cosine_ops);")
 	if err != nil {
 		slog.Error("Failed to create index on embedding vector", "error", err)
